@@ -1,0 +1,106 @@
+#!/bin/bash
+
+
+# Set Static Ip
+sudo nmcli c m "preconfigured" ipv4.addresses 192.168.0.5/24 ipv4.method manual
+sudo nmcli c m "preconfigured" ipv4.gateway 192.168.0.1
+sudo nmcli c m "preconfigured" ipv4.dns "208.67.222.222 208.67.220.220 8.8.8.8"
+sudo nmcli c down "preconfigured" && sudo nmcli c up "preconfigured"
+# or
+sudo nmcli c show
+sudo nmcli c mod 'Wired connection 1' ipv4.addresses 10.10.30.19/24 ipv4.method manual
+sudo nmcli con mod 'Wired connection 1' ipv4.gateway 10.10.30.1
+sudo nmcli con mod 'Wired connection 1' ipv4.dns "10.10.30.1"
+sudo nmcli c down 'Wired connection 1' && sudo nmcli c up 'Wired connection 1'
+
+# make orkind directory
+cd
+mkdir webcam_webserver
+cd webcam_webserver
+
+# Install pip and virtualenv if not already installed
+echo "Installing pip and virtualenv..."
+sudo apt install python3-pip python3-venv -y
+
+# Step 2: Set up a virtual environment
+echo "Setting up virtual environment..."
+python3 -m venv webcam_env
+source webcam_env/bin/activate
+
+# Step 3: Install required Python packages
+echo "Installing required packages..."
+pip install --upgrade pip
+pip install Flask opencv-python
+
+# Step 4: Create or append Python code to webcam_stream.py
+echo "Creating webcam_stream.py..."
+
+cat << EOF > webcam_stream.py
+from flask import Flask, Response
+import cv2
+import time
+
+app = Flask(__name__)
+
+# Specify the camera device path directly (e.g., '/dev/video0')
+camera_device_path = '/dev/video0'
+
+# Initialize the webcam (replace with the correct camera ID if needed)
+camera = cv2.VideoCapture(camera_device_path)
+
+# Function to check if the camera is active
+def check_camera_status():
+    # If the camera is not opened properly, return 'offline'
+    if not camera.isOpened():
+        return "Camera Offline"
+    return "Camera Live"
+
+def generate_frames():
+    while True:
+        # Check camera status
+        camera_status = check_camera_status()
+        
+        # Read the current frame from the camera
+        ret, frame = camera.read()
+        
+        if not ret:
+            break
+        
+        # Get current time and date
+        current_time = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Add date and time text on the frame
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(frame, current_time, (10, 30), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        
+        # Add camera status on the frame
+        cv2.putText(frame, camera_status, (10, 60), font, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        
+        # Encode the frame as JPEG
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        
+        # Yield the frame in the proper MJPEG format
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+
+@app.route('/')
+def index():
+    return "Hello, Webcam Streaming!"
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+EOF
+
+# Step 5: Run the Flask app
+echo "Running the Flask server..."
+python3 webcam_stream.py
+
+
+# chmod +x setup.sh
+# ./setup.sh

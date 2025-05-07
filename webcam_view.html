@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Webcam Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css"> <!-- Optional custom style -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- JS Libraries -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+        video {
+            width: 100%;
+            height: auto;
+            background: black;
+        }
+        .booth {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="card">
+                    <h5 class="card-header text-center">HTML5 & JS Live Cam</h5>
+                    <div class="card-body">
+
+                        <!-- Camera Selection -->
+                        <div class="form-group">
+                            <label for="cameraSelect">Select Camera:</label>
+                            <select id="cameraSelect" class="form-control" onchange="changeCamera(this.value)">
+                                <!-- Options added by JavaScript -->
+                            </select>
+                        </div>
+
+                        <!-- Video Stream -->
+                        <div class="booth">
+                            <video id="video" autoplay></video>
+                        </div>
+
+                        <!-- Control Buttons -->
+                        <div class="text-right">
+                            <button class="btn btn-danger" onclick="stopCam()">Stop Cam</button>
+                            <button class="btn btn-success" onclick="startCam()">Start Cam</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        let currentStream;
+
+        const stopCam = () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                document.getElementById('video').srcObject = null;
+            }
+        };
+
+        const startCam = (deviceId = null) => {
+            const constraints = {
+                video: deviceId ? { deviceId: { exact: deviceId } } : true
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    currentStream = stream;
+                    document.getElementById('video').srcObject = stream;
+                })
+                .catch(error => {
+                    console.error("Error accessing webcam:", error);
+                });
+        };
+
+        const getCameras = () => {
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => {
+                    const cameraSelect = document.getElementById('cameraSelect');
+                    cameraSelect.innerHTML = '';
+
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    videoDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `Camera ${index + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+
+                    if (videoDevices.length > 0) {
+                        startCam(videoDevices[0].deviceId);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error listing cameras:", error);
+                });
+        };
+
+        const changeCamera = (deviceId) => {
+            stopCam();
+            startCam(deviceId);
+        };
+
+        $(document).ready(() => {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                getCameras();
+            } else {
+                alert("Your browser does not support camera access.");
+            }
+        });
+    </script>
+</body>
+
+</html>
